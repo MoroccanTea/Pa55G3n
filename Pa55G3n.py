@@ -1,17 +1,16 @@
 import json
 import os
-import codecs
-import tkinter as tk
-from PIL import Image, ImageTk
 import random
+import gui as gui
 from termcolor import colored
+
 
 # TODO: Add params to run directly from command line
 # TODO: Add GUI
 # TODO: Add update and delete functionality
 # TODO: Store multiple creds of same app in same object
 
-version = '1.0-alpha'
+version = '1.2-alpha'
 
 
 def start():
@@ -32,13 +31,18 @@ def start():
 def choose():
     print('\n1. Generate a password')
     print('2. View saved passwords')
-    print('3. Exit')
+    print('3. GUI')
+    print('4. Exit')
     choice = input('\nEnter your choice: ')
     if choice == '1':
-        passDifficulty()
+        passComplexity()
     elif choice == '2':
         showPasswords()
     elif choice == '3':
+        #gui.start()
+        print(colored('\nComing soon!', 'red'))
+        choose()
+    elif choice == '4':
         print('Thank you for using pa55G3n, goodbye!')
         exit(0)
     else:
@@ -48,7 +52,9 @@ def choose():
 
 def showPasswords():
     try:
-        if os.stat('data/passwords.json').st_size == 0:
+        with open('data/passwords.json', 'r') as passFile:
+            emptyArray = True if json.load(passFile) == [] else False
+        if os.stat('data/passwords.json').st_size == 0 or emptyArray:
             print(colored('\nNo saved passwords.', 'yellow'))
         elif os.stat('data/passwords.json').st_size > 0:
             with open('data/passwords.json', 'r') as passFile:
@@ -61,7 +67,7 @@ def showPasswords():
         choose()
 
 
-def passDifficulty():
+def passComplexity():
     print('\n1. Simple', colored('(Lowercase characters only)', 'yellow'), colored('[NOT RECOMMENDED]', 'red'))
     print('2. Medium', colored('(Lowercase and uppercase characters)', 'yellow'))
     print('3. Hard', colored('  (Lowercase, uppercase and numbers)', 'yellow'))
@@ -76,7 +82,7 @@ def passDifficulty():
         exit(0)
     else:
         print(colored('\nInvalid choice', 'red'))
-        passDifficulty()
+        passComplexity()
 
 
 def passLength(choice):
@@ -117,11 +123,11 @@ def whatNext(password):
     if save.lower() == 'y' or save.lower() == '':
         savePassword(password)
     elif save.lower() == 'n':
-        choose()
+        passComplexity()
 
 
 def generate(choice, length):
-    difficulty = 'simple'
+    complexity = 'simple'
     password = ''
     intLength = int(length)
     charsSimple = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
@@ -141,18 +147,18 @@ def generate(choice, length):
     for i in range(intLength):
         password = password + random.choice(charsSimple)
     if choice == '2':
-        difficulty = 'medium'
+        complexity = 'medium'
         for i in range(intLength):
             password = password + random.choice(charsMedium)
     elif choice == '3':
-        difficulty = 'hard'
+        complexity = 'hard'
         for i in range(intLength):
             password = password + random.choice(charsHard)
     elif choice == '4':
-        difficulty = 'secure'
+        complexity = 'secure'
         for i in range(intLength):
             password = password + random.choice(charsSecure)
-    print(colored('Generated ' + difficulty + ' password : ' + password, 'green'))
+    print(colored('Generated ' + complexity + ' password : ' + password, 'green'))
     whatNext(password)
     choose()
 
