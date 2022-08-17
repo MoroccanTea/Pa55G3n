@@ -16,15 +16,18 @@ A simple free password manager.
 - [ ] Encrypt and decrypt the passwords using master password.
 - [ ] Update and delete passwords.
 - [ ] Search for passwords.
-- [ ] Run the application in a terminal using arguments.
+- [X] Run the application in a terminal using arguments.
 - [ ] Store multiple credentials of the same app in the same json object.
 - [ ] Add MySQL & MongoDB support.
 
 # Usage
 * Generate a password
-    - python3 Pa55G3n.py generate [-c | --complexity] 1-4 (Generate a password with a given complexity and with length 8)
-    - python3 Pa55G3n.py generate [-l | --length] 8 [-c | --complexity] 1-4 (Generate a password with a given length and complexity)
+    - python3 Pa55G3n.py [-g | --generate -c | --complexity] 1-4 (Generate a password with a given complexity and with length 8)
+    - python3 Pa55G3n.py [-g | --generate -l | --length] 8 [-c | --complexity] 1-4 (Generate a password with a given length and complexity)
+    - python3 Pa55G3n.py [-g | --generate -l | --length] 8 [-c | --complexity] 1-4 [-s | --save] (Generate a password with a given length and complexity and save)
 * Show saved passwords
-    - python3 Pa55G3n.py show
+    - python3 Pa55G3n.py [-v | --view]
 * Show help
-    - python3 Pa55G3n.py help
+    - python3 Pa55G3n.py [-h | --help]
+* show version
+    - python3 Pa55G3n.py [--version]

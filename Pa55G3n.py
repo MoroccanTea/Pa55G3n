@@ -1,16 +1,21 @@
 import json
 import os
 import random
-import gui as gui
-from termcolor import colored
+import argparse
+import sys
 
+from termcolor import colored
 
 # TODO: Add params to run directly from command line
 # TODO: Add GUI
 # TODO: Add update and delete functionality
 # TODO: Store multiple creds of same app in same object
+# TODO: search functionality
 
 version = '1.2-alpha'
+usingarguments = False
+if len(sys.argv) != 1:
+    usingarguments = True
 
 
 def start():
@@ -39,7 +44,7 @@ def choose():
     elif choice == '2':
         showPasswords()
     elif choice == '3':
-        #gui.start()
+        # gui.start()
         print(colored('\nComing soon!', 'red'))
         choose()
     elif choice == '4':
@@ -74,10 +79,10 @@ def passComplexity():
     print('4. Secure', colored('(Lowercase, uppercase, numbers and special characters)', 'yellow'),
           colored('[RECOMMENDED]', 'green'))
     print('5. Exit')
-    choice = input('\nEnter your choice: ')
-    if choice == '1' or choice == '2' or choice == '3' or choice == '4':
-        passLength(choice)
-    elif choice == '5':
+    complexity = input('\nEnter your choice: ')
+    if complexity in ('1', '2', '3', '4'):
+        passLength(complexity)
+    elif complexity == '5':
         print('Thank you for using pa55G3n, goodbye!')
         exit(0)
     else:
@@ -85,17 +90,17 @@ def passComplexity():
         passComplexity()
 
 
-def passLength(choice):
+def passLength(complexity):
     print('\nHow long should the password be?\nThe default length is 8 characters.')
     length = input('\nEnter the desired length: ')
     if length == '':
-        generate(choice, 8)
+        generate(complexity, 8)
     elif int(length) > 0:
-        generate(choice, length)
+        generate(complexity, length)
     else:
         print(colored('\nInvalid choice', 'red'))
         print(length, type(length))
-        passLength(choice)
+        passLength(complexity)
 
 
 def savePassword(password):
@@ -159,9 +164,41 @@ def generate(choice, length):
         for i in range(intLength):
             password = password + random.choice(charsSecure)
     print(colored('Generated ' + complexity + ' password : ' + password, 'green'))
-    whatNext(password)
-    choose()
+    if not usingarguments:
+        whatNext(password)
+        choose()
+    else:
+        savePassword(password)
 
+
+# savePassword(generate(str(4), 8))
 
 if __name__ == '__main__':
-    start()
+    parser = argparse.ArgumentParser(description='Pa55G3n ' + version + ' - A simple password Generator')
+    parser.add_argument('--version', action='version', version='%(prog)s ' + version)
+    parser.add_argument('-g', '--generate', action='store_true', help='generate a password')
+    parser.add_argument('-v', '--View', action='store_true', help='view saved passwords')
+    parser.add_argument('-u', '--gui', action='store_true', help='start in GUI mode [AVAILABLE IN NEXT VERSION]')
+    parser.add_argument('-c', '--complexity', type=str, default='4', help='choose password complexity',
+                        choices=['1', '2', '3', '4'])
+    parser.add_argument('-l', '--length', type=int, default='8', help='choose password length')
+    parser.add_argument('-s', '--save', action='store_true', help='auto save on generation')
+    args = parser.parse_args()
+    if not usingarguments:
+        start()
+    else:
+        if args.gui:
+            # gui.startGUI()
+            print((colored('\nAvailable soon...', 'red')))
+            exit(0)
+        elif args.View:
+            showPasswords()
+        elif args.generate and args.complexity and args.length and args.save:
+            savePassword(generate(str(args.complexity), args.length))
+        elif args.generate and args.complexity and args.length:
+            generate(str(args.complexity), args.length)
+        elif args.generate:
+            passComplexity()
+        else:
+            print(colored('\nError, invalid argument.', 'red'))
+            exit(1)
