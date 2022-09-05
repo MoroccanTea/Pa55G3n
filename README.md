@@ -11,14 +11,17 @@ A simple free password manager.
 # Features
 - [X] Generate a password with a given length and complexity.
 - [X] Store the passwords in a file.
-- [ ] GUI.
-- [ ] Encrypt and decrypt the passwords using master password.
-- [ ] Update and delete passwords.
 - [X] Search for passwords.
 - [X] Run the application in a terminal using arguments.
 - [X] Store multiple credentials of the same app in the same json object.
-- [ ] Add SQLite, MySQL & MongoDB support.
-- [ ] Upload the passwords from a file to db.
+- [X] Update and delete passwords.
+- [ ] Encrypt and decrypt the passwords using master password.
+- [ ] 2FA / MFA.
+- [ ] SQLite, MySQL & MongoDB support.
+- [ ] Upload the passwords from a file to db or the other way around.
+- [ ] Deploy and test security measures (e.g. buffer overflow,bruteforce, canary, etc).
+- [ ] GUI.
+- [ ] Browser extension.
 
 # Usage
 * Generate a password

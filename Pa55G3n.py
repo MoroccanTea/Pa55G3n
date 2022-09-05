@@ -4,18 +4,22 @@ import random
 import argparse
 import sys
 import string
-from termcolor import colored
+import sqlite_connector
+import pyotp
 
-# TODO: 1. Add update and delete functionality (WIP)
-# TODO: 2. Encrypt passwords using master password
-# TODO: 3. Add 2FA
-# TODO: 4. Add database connectivity (SQLite, MySQL & MongoDB)
+from termcolor import colored
+from cryptography.fernet import Fernet
+
+# TODO: 1. Encrypt passwords using master password (WIP)
+# TODO: 2. Add 2FA
+# TODO: 3. Add database connectivity (SQLite, MySQL & MongoDB)
+# TODO: 4. File to db migration (both ways)
 # TODO: 5. Add security measures (e.g. prevent buffer overflow attacks, canary, etc.)
 # TODO: 6. Add GUI
 # TODO: 7. Add browser extension
 
 
-version = '1.3-alpha'
+version = '1.4-alpha'
 using_arguments = False
 if len(sys.argv) != 1:
     using_arguments = True
@@ -39,7 +43,8 @@ def choose():
     print('4. Search specific password')
     print('5. Update existing credentials')
     print('6. Delete existing credentials')
-    print('7. Exit')
+    print('7. Set master password')
+    print('8. Exit')
     choice = input('\nEnter your choice: ')
     if choice == '1':
         pass_complexity()
@@ -56,6 +61,8 @@ def choose():
     elif choice == '6':
         delete()
     elif choice == '7':
+        set_master_password()
+    elif choice == '8':
         print('Thank you for using pa55G3n, goodbye!')
         exit(0)
     else:
@@ -118,56 +125,167 @@ def pass_length(complexity):
 
 
 def update_existing(credentials, app, username, password):
-    update_existing_creds = input(colored(
-        '\n[!] Credentials for this application with this username already exist, would you like to '
-        'update them ? [y/N]',
-        'yellow'))
-    if update_existing_creds.lower() == 'y':
-        credentials[app][username] = {"password": password}
-        print(colored('\nCredentials updated.', 'green'))
-    elif update_existing_creds.lower() == 'n' or update_existing_creds.lower() == '':
-        print(colored('\nOperation cancelled', 'yellow'))
-        pass_complexity()
-        save_password(password)
-    else:
-        print(colored('\nInvalid choice', 'red'))
-        pass_complexity()
-        save_password(password)
+    credentials[app][username] = {"password": password}
+    return credentials
 
 
-# TODO: FIX THIS NOT WORKING !
+def listing(credentials, choice):  # 0 = app, 1 = username
+    listed_output = []
+    if choice == 0:
+        for i, app in enumerate(credentials):
+            listed_output.append(app)
+            print(str(i) + '.' + app)
+    elif choice == 1:
+        for i, username in enumerate(credentials):
+            listed_output.append(username)
+            print(str(i) + '.' + username)
+    return listed_output
+
+
+# TODO: IMPROVE THIS!
 def update():
-    print(colored('\nComing soon!', 'red'))
-    choose()
     with open('data/credentials.json', 'r') as credsFile:
         credentials = json.load(credsFile)
         credsFile.close()
-    for i, cred in enumerate(credentials):
-        print(i, '. ', cred)
-    cred_number = input(colored('\nPlease choose the number of the credentials you would like to update: ', 'yellow'))
-    if cred_number.isdigit():
-        if int(cred_number) < len(credentials):
-            app = input(colored('\nPlease enter the application name: ', 'yellow'))
-            username = input(colored('\nPlease enter the username: ', 'yellow'))
-            password = input(colored('\nPlease enter the password: ', 'yellow'))
-            if app in credentials:
-                if username in credentials[app]:
-                    update_existing(credentials, app, username, password)
-                else:
-                    print(colored('\nCredentials for this application with this username do not exist.', 'red'))
-                    update()
+    what_to_update = input(
+        '\nWould you like to update an Application name, a Username or a Password ? [A|U|P] [Enter to return to main menu]')  # IDENTIFY WHAT TO CHANGE
+    if what_to_update == '':
+        choose()
+    elif what_to_update.upper() == 'A':  # UPDATE APP NAME
+        listing(credentials, 0)
+        app_index = input(
+            colored("\nPlease choose the number of the application's credentials you would like to update: ", "yellow"))
+        if app_index.isdigit():
+            chosen_app = listing(credentials, 0)[int(app_index)]
+            new_app_name = input(colored("\nPlease enter the new application name: ", "yellow"))
+            credentials[new_app_name] = credentials.pop(chosen_app)
+            write_to_file(credentials)
+        else:
+            print(colored("\nInvalid choice", "red"))
+            update()
+    elif what_to_update.upper() == 'U':  # UPDATE USERNAME
+        listing(credentials, 0)
+        app_index = input(
+            colored("\nPlease choose the number of the application's credentials you would like to update: ", "yellow"))
+        chosen_app = listing(credentials, 0)[int(app_index)]
+        if len(credentials[chosen_app]) > 1:
+            listing(credentials[chosen_app], 1)
+            username_index = input(
+                colored("\nPlease choose the number of the username you would like to update: ", "yellow"))
+            if username_index.isdigit():
+                chosen_username = listing(credentials[chosen_app], 1)[int(username_index)]
+                new_username = input(colored('\nPlease enter the new username: ', 'yellow'))
+                credentials[chosen_app][new_username] = credentials[chosen_app].pop(chosen_username)
+                write_to_file(credentials)
             else:
-                print(colored('\nCredentials for this application do not exist.', 'red'))
+                print(colored("\nInvalid choice", "red"))
                 update()
+        else:
+            chosen_username = list(credentials[chosen_app].keys())[0]
+            new_username = input(colored('\nPlease enter the new username: ', 'yellow'))
+            credentials[chosen_app][new_username] = credentials[chosen_app].pop(chosen_username)
+            write_to_file(credentials)
+            print(chosen_username)
+    elif what_to_update.upper() == 'P':  # UPDATE PASSWORD
+        listing(credentials, 0)
+        app_index = input(
+            colored("\nPlease choose the number of the application's credentials you would like to update: ", "yellow"))
+        chosen_app = listing(credentials, 0)[int(app_index)]
+        listing(credentials[chosen_app], 1)
+        username_index = input(
+            colored("\nPlease choose the number of the username's credentials you would like to update: ", "yellow"))
+        chosen_username = listing(credentials[chosen_app], 1)[int(username_index)]
+        own_pass = input(
+            '\nWould you like to ' + colored('Choose', 'yellow') + ' a password yourself or ' + colored(
+                'Generate',
+                'green') + ' a new one ? [' + colored('c', 'yellow') + '|' + colored('G',
+                                                                                     'green') + ']')
+        if own_pass.lower() == 'c':
+            password = input(colored('\nPlease enter the password you would like to use: ', 'yellow'))
+            credentials[chosen_app][chosen_username] = {"password": password}
+            write_to_file(credentials)
+        elif own_pass.lower() == 'g' or own_pass.lower() == '':
+            chars = list(string.digits + string.ascii_letters + string.punctuation)
+            chars.remove('"')
+            for i in range(16):
+                password = ''
+                password += random.choice(chars)
+                credentials[chosen_app][chosen_username] = {"password": password}
+            write_to_file(credentials)
+
         else:
             print(colored('\nInvalid choice', 'red'))
             update()
 
 
-# TODO: ADD THIS !
+def write_to_file(credentials):
+    try:
+        with open('data/credentials.json', 'w') as credsFile:
+            json.dump(credentials, credsFile, indent=4)
+            credsFile.close()
+        choose()
+        print(colored('\nCredentials saved successfully', 'green'))
+    except FileNotFoundError:
+        print(colored('\nCould not find credentials file.', 'red'))
+        choose()
+
+
+# TODO: IMPROVE THIS!
 def delete():
-    print(colored('\nComing soon!', 'red'))
-    choose()
+    with open('data/credentials.json', 'r') as credsFile:
+        credentials = json.load(credsFile)
+        credsFile.close()
+    what_to_delete = input(
+        '\nWould you like to delete an Application, or a Username  ? [A|U] [Enter to return to main menu]')  # IDENTIFY WHAT TO DELETE
+    if what_to_delete == '':  # RETURN TO MAIN MENU
+        choose()
+    elif what_to_delete.upper() == 'A':  # DELETE APP
+        listing(credentials, 0)
+        app_index = input(
+            colored("\nPlease choose the number of the application's credentials you would like to delete: ", "yellow"))
+        if app_index.isdigit():
+            chosen_app = listing(credentials, 0)[int(app_index)]
+            sure = input(colored(
+                '\nAre you sure you want to delete ' + chosen_app + ' ? [Y|N], all credentials linked that are a part of this app will also be deleted, please note that this action is irreversible.',
+                'red'))
+            if sure.lower() == 'y' or sure.lower() == '':
+                credentials.pop(chosen_app)
+                write_to_file(credentials)
+        else:
+            print(colored("\nInvalid choice", "red"))
+            update()
+    elif what_to_delete.upper() == 'U':  # DELETE USERNAME
+        listing(credentials, 0)
+        app_index = input(
+            colored(
+                "\nPlease choose the number of the application's credentials containing the username you would like to delete: ",
+                "yellow"))
+        chosen_app = listing(credentials, 0)[int(app_index)]
+        if len(credentials[chosen_app]) > 1:
+            listing(credentials[chosen_app], 1)
+            username_index = input(
+                colored("\nPlease choose the number of the username you would like to delete: ", "yellow"))
+            if username_index.isdigit():
+                chosen_username = listing(credentials[chosen_app], 1)[int(username_index)]
+                sure = input(colored(
+                    '\nAre you sure you want to delete ' + chosen_username + ' ? [Y|N], please note that this action is irreversible.',
+                    'red'))
+                if sure.lower() == 'y' or sure.lower() == '':
+                    credentials[chosen_app].pop(chosen_username)
+                    write_to_file(credentials)
+                else:
+                    update()
+            else:
+                print(colored("\nInvalid choice", "red"))
+                update()
+        else:
+            chosen_username = list(credentials[chosen_app].keys())[0]
+            sure = input(colored(
+                '\nAre you sure you want to delete ' + chosen_username + ' ? [Y|N], please note that this action is irreversible.',
+                'red'))
+            if sure.lower() == 'y' or sure.lower() == '':
+                credentials[chosen_app].pop(chosen_username)
+                write_to_file(credentials)
 
 
 def save_password(password):
@@ -185,15 +303,27 @@ def save_password(password):
                 credentials.update({app: {username: {"password": password}}})
                 json.dump(credentials, credsFile, sort_keys=True, indent=4)
                 credsFile.close()
-            if username not in credentials[app]:  # App exists but the username does not exist in the list
+                print(colored('\nPassword saved!', 'green'))
+            elif username not in credentials[app]:  # App exists but the username does not exist in the list
                 credentials[app].update({username: {"password": password}})
                 json.dump(credentials, credsFile, sort_keys=True, indent=4)
                 credsFile.close()
-            elif app == credentials[app] and username in credentials[app]:  # App and the username exist in the list
-                update_existing(credentials, app, username, password)
+                print(colored('\nPassword saved!', 'green'))
+            elif app in credentials and username in credentials[app]:  # App and the username exist in the list
+                update_existing_creds = input(colored(
+                    '\n[!] Credentials for this application with this username already exist, would you like to '
+                    'update them ? [y/N]',
+                    'yellow'))
+                if update_existing_creds.lower() == 'y':
+                    credentials = update_existing(credentials, app, username, password)
+                    print(colored('\nPassword saved!', 'green'))
+                elif update_existing_creds.lower() == 'n' or update_existing_creds.lower() == '':
+                    print(colored('\nOperation cancelled', 'yellow'))
+                else:
+                    print(colored('\nInvalid choice', 'red'))
+                    save_password(password)
                 json.dump(credentials, credsFile, sort_keys=True, indent=4)
                 credsFile.close()
-        print(colored('\nPassword saved!', 'green'))
         choose()
     except FileNotFoundError:
         print(colored('\nError, could not save the password.', 'red'))
@@ -274,6 +404,47 @@ def search(arg_keyword):
     choose()
 
 
+def encrypt_password(password, master_pass):
+    password.encode()
+    return Fernet.encrypt(password, master_pass)
+
+
+def decrypt_password(password):
+    master_pass = input(colored('\nEnter your master password: ', 'yellow')).encode()
+    return Fernet.decrypt(password, master_pass)
+
+
+def set_master_password():
+    gen = input(colored('\nDo you want to generate a strong master password or choose your own? [G/c]: ', 'yellow'))
+    if gen.lower() == 'g' or gen.lower() == '':
+        master_password = Fernet.generate_key().decode()
+        with open('data/master_password.txt', 'w') as masterFile:
+            masterFile.write(master_password)
+            masterFile.close()
+        print(colored('\nGenerated master password: ', 'green') + master_password)
+        print(colored(
+            '\nMaster password created successfully, please save it somewhere safe and try not to lose it as it will be used to encrypt your password.',
+            'green'))
+        choose()
+    elif gen.lower() == 'c':  # TODO : Doesn't work yet
+        master_password = input(colored('Please enter your new Master password: ', 'yellow'))
+        master_password_confirm = input(colored('Please confirm your new Master password: ', 'yellow'))
+        if master_password == master_password_confirm:
+            with open('data/master_password.txt', 'w') as masterFile:
+                masterFile.write(master_password)
+                masterFile.close()
+                print(colored(
+                    '\nMaster password created successfully, please save it somewhere safe and try not to lose it as it will be used to encrypt your password.',
+                    'green'))
+                choose()
+        else:
+            print(colored('\n[!] Passwords do not match!', 'red'))
+            set_master_password()
+    else:
+        print(colored('\n[!] Invalid choice', 'red'))
+        set_master_password()
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Pa55G3n ' + version + ' - A simple password Generator')
     parser.add_argument('-v', '--version', action='version', version='%(prog)s ' + version)
@@ -282,6 +453,7 @@ if __name__ == '__main__':
     parser.add_argument('-u', '--gui', action='store_true', help='start in GUI mode [AVAILABLE IN NEXT VERSION]')
     parser.add_argument('-c', '--complexity', type=str, default='4', help='choose password complexity',
                         choices=['1', '2', '3', '4'])
+    parser.add_argument('-m', '--set-master', action='store_true', help='set a master password')
     parser.add_argument('-l', '--length', type=int, default='8', help='choose password length')
     parser.add_argument('-s', '--save', action='store_true', help='auto save on generation')
     parser.add_argument('-f', '--find', type=str, help='search for credentials')
@@ -303,6 +475,8 @@ if __name__ == '__main__':
             pass_complexity()
         elif args.find:
             search(args.find)
+        elif args.set_master:
+            set_master_password()
         else:
             print(colored('\nError, invalid argument.', 'red'))
             exit(1)
